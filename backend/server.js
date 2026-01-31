@@ -41,40 +41,42 @@ app.get("/health", (req, res) => {
 });
 
 // Submit task (POST)
-app.post("/api/kling/:model", requireAppToken, upload.single("image"), async (req, res) => {
+app.post("/api/kling/:model", requireAppToken, async (req, res) => {
   try {
-    const { model } = req.params;
-    const apiKey = getFreepikKey(req);
+    const { prompt, negative_prompt, image_base64, duration, creativity } = req.body;
 
-    if (!apiKey) return res.status(400).json({ message: "Missing Freepik API Key (set FREEPIK_API_KEY or send x-freepik-api-key)" });
-    if (!req.file) return res.status(400).json({ message: "Missing image file (field name: image)" });
-    if (!req.body?.prompt) return res.status(400).json({ message: "Missing prompt" });
+    if (!image_base64) {
+      return res.status(400).json({ message: "Missing image_base64" });
+    }
 
-    const fd = new FormData();
-    fd.append("prompt", req.body.prompt);
+    // convert base64 → buffer
+    const buffer = Buffer.from(image_base64, "base64");
 
-    if (req.body.negative_prompt) fd.append("negative_prompt", req.body.negative_prompt);
-    if (req.body.creativity !== undefined) fd.append("creativity", String(req.body.creativity));
-    if (req.body.duration) fd.append("duration", String(req.body.duration));
+    const formData = new FormData();
+    formData.append("prompt", prompt);
+    formData.append("negative_prompt", negative_prompt || "");
+    formData.append("duration", duration);
+    formData.append("creativity", creativity);
 
-    // image must be binary buffer
-    fd.append("image", req.file.buffer, { filename: req.file.originalname || "image.png" });
-
-    const r = await fetch(`${BASE_URL}/${model}`, {
-      method: "POST",
-      headers: {
-        "x-freepik-api-key": apiKey,
-        ...fd.getHeaders(),
-      },
-      body: fd,
+    // ⬅️ INI PENTING
+    formData.append("image", buffer, {
+      filename: "image.png",
+      contentType: "image/png"
     });
 
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) return res.status(r.status).json(data);
+    const r = await fetch(FREEPIK_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "x-freepik-api-key": getFreepikKey(req),
+      },
+      body: formData
+    });
 
+    const data = await r.json();
     res.json(data);
+
   } catch (e) {
-    res.status(500).json({ message: e?.message || "Server error" });
+    res.status(500).json({ message: e.message });
   }
 });
 
