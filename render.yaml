@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: kling-backend-proxy
+    env: node
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      # Set these in Render dashboard securely (recommended)
+      # - key: FREEPIK_API_KEY
+      #   sync: false
+      # - key: APP_TOKEN
+      #   sync: false
